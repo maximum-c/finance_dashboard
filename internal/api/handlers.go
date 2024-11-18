@@ -1,6 +1,7 @@
 package api
 
 import (
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -10,7 +11,7 @@ import (
 )
 
 type Handler struct {
-	service *service.FinanceService
+	Service *service.FinanceService
 }
 
 func (h *Handler) UploadCSV(c *gin.Context) {
@@ -20,6 +21,7 @@ func (h *Handler) UploadCSV(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "Invalid account ID",
 		})
+		log.Printf("Error parsing Account ID: %v\n", err)
 	}
 
 	file, header, err := c.Request.FormFile("file")
@@ -30,8 +32,6 @@ func (h *Handler) UploadCSV(c *gin.Context) {
 		})
 		return
 	}
-	defer file.Close()
-
 	if header.Size == 0 {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "Empty File",
@@ -39,13 +39,22 @@ func (h *Handler) UploadCSV(c *gin.Context) {
 		return
 	}
 
+	const maxFileSize = 10 * 1024 * 1024 // 10 MB
+	if header.Size > maxFileSize {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "File size exceeds the limit of 10 MB.",
+		})
+		return
+	}
+	defer file.Close()
+
 	if !strings.HasSuffix(header.Filename, ".csv") {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "File must be CSV",
 		})
 		return
 	}
-	count, err := h.service.ImportCSV(file, accountID)
+	count, err := h.Service.ImportCSV(file, accountID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": err.Error(),
@@ -53,7 +62,8 @@ func (h *Handler) UploadCSV(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{
-		"message": "successfully imported transactions",
-		"count":   count,
+		"message":  "successfully imported transactions",
+		"filename": header.Filename,
+		"count":    count,
 	})
 }

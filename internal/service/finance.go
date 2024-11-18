@@ -1,22 +1,22 @@
 package service
 
 import (
-	"database/sql"
 	"encoding/csv"
 	"fmt"
 	"github.com/maximum-c/finance_dashboard/internal/models"
 	"github.com/maximum-c/finance_dashboard/internal/storage"
 	"io"
+	"strconv"
 	"strings"
 	"time"
 )
 
 type FinanceService struct {
-	db *sql.DB
+	Storage *storage.TransactionStorage
 }
 
-func NewFinanceService(db *sql.DB) *FinanceService {
-	return &FinanceService{db: db}
+func NewFinanceService(Storage *storage.TransactionStorage) *FinanceService {
+	return &FinanceService{Storage: Storage}
 }
 func validateHeaders(headers []string) (map[string]int, error) {
 	required := map[string]bool{
@@ -53,6 +53,9 @@ func (s *FinanceService) ImportCSV(file io.Reader, accoundID int64) (int, error)
 	}
 
 	headerMap, err := validateHeaders(csvHeaders)
+	if err != nil {
+		return 0, fmt.Errorf("invalid headers: %w", err)
+	}
 
 	var transactions []models.Transaction
 	lineNumber := 1
@@ -64,17 +67,20 @@ func (s *FinanceService) ImportCSV(file io.Reader, accoundID int64) (int, error)
 		}
 
 		if err != nil {
-			return 0, fmt.Errorf("Failed to read line %d: %w", lineNumber, err)
+			return 0, fmt.Errorf("failed to read line %d: %w", lineNumber, err)
 		}
 
 		transaction, err := parseTransaction(record, headerMap, accoundID)
 		if err != nil {
-			return 0, fmt.Errorf("Failed to parse transaction on line %d: %w", lineNumber, err)
+			return 0, fmt.Errorf("failed to parse transaction on line %d: %w", lineNumber, err)
 		}
 		transactions = append(transactions, transaction)
 		lineNumber++
 	}
-	err := //store via 
+	err = s.Storage.AddTransactions(transactions)
+	if err != nil {
+		return 0, err
+	}
 	return len(transactions), nil
 }
 func parseTransaction(record []string, headerMap map[string]int, accountID int64) (models.Transaction, error) {
@@ -88,7 +94,7 @@ func parseTransaction(record []string, headerMap map[string]int, accountID int64
 		return models.Transaction{}, err
 	}
 
-	amount, err := strconv.ParseFloat(record[2])
+	amount, err := strconv.ParseFloat(amountStr, 64)
 	if err != nil {
 		return models.Transaction{}, fmt.Errorf("invalid amount: %s", amountStr)
 	}

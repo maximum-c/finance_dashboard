@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/maximum-c/finance_dashboard/internal/api"
 	"github.com/maximum-c/finance_dashboard/internal/service"
 	"github.com/maximum-c/finance_dashboard/internal/storage"
 )
@@ -22,14 +23,15 @@ func main() {
 	defer db.Close()
 
 	transactionStorage := storage.NewTransactionStorage(db)
-	financeService := service.NewFinanceService(db)
+	financeService := service.NewFinanceService(transactionStorage)
+	handler := &api.Handler{Service: financeService}
 
 	r := gin.Default()
 
-	r.GET("/ping", func(c *gin.Context) {
-		c.JSON(200, gin.H{
-			"message": "pong",
-		})
-	})
-	log.Fatal(r.Run(":8080"))
+	r.POST("/upload/:accountID", handler.UploadCSV)
+
+	if err := r.Run(":8080"); err != nil {
+		log.Fatal(err)
+	}
+
 }

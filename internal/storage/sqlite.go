@@ -2,16 +2,23 @@ package storage
 
 import (
 	"database/sql"
-	"github.com/maximum-c/finance_dashboard/internal/models"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
+
+	"github.com/maximum-c/finance_dashboard/internal/models"
 )
 
 type TransactionStorage struct {
-	db *sql.DB
+	db           *sql.DB
+	inMemoryData []models.Transaction
+	mu           sync.Mutex
 }
 
+func NewTransactionStorage(db *sql.DB) *TransactionStorage {
+	return &TransactionStorage{db: db}
+}
 func InitDB(dbPath string) error {
 	// Ensure directory exists
 	dir := filepath.Dir(dbPath)
@@ -51,26 +58,52 @@ func InitDB(dbPath string) error {
 	}
 	return nil
 }
-
-func NewTransactionStorage(db *sql.DB) *TransactionStorage {
-	return &TransactionStorage{db: db}
-}
-
 func (s *TransactionStorage) CreateTransaction(t *models.Transaction) error {
 	query := `
-	INSERT INTO transactions (date, description, amount, account_id, created_at)
-	VALUES (?, ?, ?, ?, ?)
-	`
-	result, err := s.db.Exec(query, t.Date, t.Description, t.Amount, t.AccountID, t.CreatedAt)
+        INSERT INTO transactions (date, description, amount, category, account_id, created_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+    `
+	result, err := s.db.Exec(query, t.Date, t.Description, t.Amount, t.Category, t.AccountID, t.CreatedAt)
 	if err != nil {
 		return err
 	}
+
+	// If you need the ID of the newly inserted transaction
 	id, err := result.LastInsertId()
 	if err != nil {
 		return err
 	}
 	t.ID = id
+
 	return nil
+}
+func (s *TransactionStorage) AddTransactions(transactions []models.Transaction) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	query := `
+	INSERT INTO transactions (date, description, amount, account_id, created_at)
+	VALUES (?, ?, ?, ?, ?)
+	`
+
+	stmt, err := tx.Prepare(query)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+	for _, t := range transactions {
+		_, err := stmt.Exec(t.Date, t.Description, t.Amount, t.Category, t.AccountID, t.CreatedAt)
+		if err != nil {
+			return err
+		}
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.inMemoryData = append(s.inMemoryData, transactions...)
+
+	return tx.Commit()
 }
 
 func (s *TransactionStorage) GetTransactions(filter models.TransactionFilter) ([]models.Transaction, error) {
