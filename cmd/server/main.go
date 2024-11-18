@@ -2,10 +2,12 @@ package main
 
 import (
 	"database/sql"
+	"log"
+
 	"github.com/gin-gonic/gin"
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/maximum-c/finance_dashboard/internal/service"
 	"github.com/maximum-c/finance_dashboard/internal/storage"
-	"log"
 )
 
 func main() {
@@ -20,6 +22,7 @@ func main() {
 	defer db.Close()
 
 	transactionStorage := storage.NewTransactionStorage(db)
+	financeService := service.NewFinanceService(db)
 
 	r := gin.Default()
 
