@@ -94,7 +94,7 @@ func (s *TransactionStorage) AddTransactions(transactions []models.Transaction) 
 	}
 	defer stmt.Close()
 	for _, t := range transactions {
-		_, err := stmt.Exec(t.Date, t.Description, t.Amount, t.Category, t.AccountID, t.CreatedAt)
+		_, err := stmt.Exec(t.Date, t.Description, t.Amount, t.Category, t.AccountID)
 		if err != nil {
 			return err
 		}

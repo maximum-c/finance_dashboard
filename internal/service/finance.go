@@ -89,7 +89,7 @@ func parseTransaction(record []string, headerMap map[string]int, accountID int64
 	description := record[headerMap["description"]]
 	amountStr := record[headerMap["amount"]]
 
-	date, err := time.Parse("2006-01-02 3:04PM", dateStr)
+	date, err := time.Parse("2006-01-02 3:04 PM", dateStr)
 	if err != nil {
 		return models.Transaction{}, err
 	}
