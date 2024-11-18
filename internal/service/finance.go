@@ -2,12 +2,13 @@ package service
 
 import (
 	"database/sql"
-	"fmt"
-	//"time"
 	"encoding/csv"
-	"io"
-
+	"fmt"
 	"github.com/maximum-c/finance_dashboard/internal/models"
+	"github.com/maximum-c/finance_dashboard/internal/storage"
+	"io"
+	"strings"
+	"time"
 )
 
 type FinanceService struct {
@@ -17,8 +18,32 @@ type FinanceService struct {
 func NewFinanceService(db *sql.DB) *FinanceService {
 	return &FinanceService{db: db}
 }
+func validateHeaders(headers []string) (map[string]int, error) {
+	required := map[string]bool{
+		"date":        false,
+		"description": false,
+		"amount":      false,
+	}
 
-func (s *FinanceService) ImportCSV(file io.Reader, accoundID int64) (int64, error) {
+	headerMap := make(map[string]int)
+
+	for i, header := range headers {
+		normalized := strings.ToLower(strings.TrimSpace(header))
+		headerMap[normalized] = i
+		if _, isRequired := required[normalized]; isRequired {
+			required[normalized] = true
+		}
+	}
+
+	for header, found := range required {
+		if !found {
+			return nil, fmt.Errorf("missing required header: %s", header)
+		}
+	}
+	return headerMap, nil
+
+}
+func (s *FinanceService) ImportCSV(file io.Reader, accoundID int64) (int, error) {
 	reader := csv.NewReader(file)
 
 	csvHeaders, err := reader.Read()
@@ -29,61 +54,58 @@ func (s *FinanceService) ImportCSV(file io.Reader, accoundID int64) (int64, erro
 
 	headerMap, err := validateHeaders(csvHeaders)
 
-	expectedHeaders := map[string]bool{
-		"date":        false,
-		"description": false,
-		"amount":      false,
-	}
-
-	for _, col := range csvHeaders {
-		if _, exists := expectedHeaders[strings.ToLower(col)]; exists {
-			expectedHeaders[strings.ToLower(col)] = true
-		}
-	}
-
-	for col, found := range expectedHeaders {
-		if !found {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"error":       "Missing Required Column",
-				"description": fmt.Sprintf("Column '%s' not found", col),
-			})
-		}
-	}
-
 	var transactions []models.Transaction
+	lineNumber := 1
 	for {
 		record, err := reader.Read()
+
 		if err == io.EOF {
 			break
 		}
+
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"error":       "Failed to read CSV record",
-				"description": err.Error(),
-			})
-			return
+			return 0, fmt.Errorf("Failed to read line %d: %w", lineNumber, err)
 		}
 
-		transaction, err := parseTransaction(record, csvHeaders)
+		transaction, err := parseTransaction(record, headerMap, accoundID)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"error":       "Failed to parse transaction",
-				"description": err.Error(),
-			})
-			return
+			return 0, fmt.Errorf("Failed to parse transaction on line %d: %w", lineNumber, err)
 		}
 		transactions = append(transactions, transaction)
+		lineNumber++
 	}
-	if err := h.service.ImportTransactions(transactions); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error":       "Failed to import transactions",
-			"description": err.Error(),
-		})
-		return
-	}
+	err := //store via 
+	return len(transactions), nil
 }
+func parseTransaction(record []string, headerMap map[string]int, accountID int64) (models.Transaction, error) {
+	//todo implment transaction parsing.
+	dateStr := record[headerMap["date"]]
+	description := record[headerMap["description"]]
+	amountStr := record[headerMap["amount"]]
 
-func validateHeaders(headers []string) map[string]int
+	date, err := time.Parse("2006-01-02 3:04PM", dateStr)
+	if err != nil {
+		return models.Transaction{}, err
+	}
+
+	amount, err := strconv.ParseFloat(record[2])
+	if err != nil {
+		return models.Transaction{}, fmt.Errorf("invalid amount: %s", amountStr)
+	}
+	var category string
+	if categoryIndex, exists := headerMap["category"]; exists && categoryIndex < len(record) {
+		category = record[categoryIndex]
+	}
+	return models.Transaction{
+		Date:        date,
+		Description: description,
+		Amount:      amount,
+		Category:    category,
+		AccountID:   accountID,
+		CreatedAt:   time.Now(),
+	}, nil
+
+}
 
 func (s *FinanceService) ImportTransactions(transactions []models.Transaction) error {
 	// todo implement
