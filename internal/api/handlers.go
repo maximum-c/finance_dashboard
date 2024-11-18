@@ -6,6 +6,9 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"strconv"
+	"time"
+	"unicode"
 
 	"github.com/gin-gonic/gin"
 	"github.com/maximum-c/finance_dashboard/internal/models"
@@ -17,6 +20,14 @@ type Handler struct {
 }
 
 func (h *Handler) UploadCSV(c *gin.Context) {
+	
+	accountID, err := strconv.ParseInt(c.Param("accountID"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Invalid account ID",
+		})
+	}
+
 	file, header, err := c.Request.FormFile("file")
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -41,66 +52,25 @@ func (h *Handler) UploadCSV(c *gin.Context) {
 		return
 	}
 
-	reader := csv.NewReader(file)
-
-	csvHeaders, err := reader.Read()
-
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error":       "Failed to read CSV headers",
-			"description": err.Error(),
-		})
-		return
-	}
-
-	expectedHeaders := map[string]bool{
-		"date":        false,
-		"description": false,
-		"amount":      false,
-	}
-
-	for _, col := range csvHeaders {
-		if _, exists := expectedHeaders[strings.ToLower(col)]; exists {
-			expectedHeaders[strings.ToLower(col)] = true
-		}
-	}
-
-	for col, found := range expectedHeaders {
-		if !found {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"error":       "Missing Required Column",
-				"description": fmt.Sprintf("Column '%s' not found", col),
-			})
-		}
-	}
-
-	var transactions []models.Transaction
-	for {
-		record, err := reader.Read()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"error":       "Failed to read CSV record",
-				"description": err.Error(),
-			})
-			return
-		}
-
-		transaction, err := parseTransaction(record, csvHeaders)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"error":       "Failed to parse transaction",
-				"description": err.Error(),
-			})
-			return
-		}
-		transactions = append(transactions, transaction)
-
-	}
+c.JSON(http.StatusOK, gin.H{
+		"message": "successfully imported transactions",
+		"count":   len(transactions),
+	})
 }
 func parseTransaction(record []string, headers []string) (models.Transaction, error) {
 	//todo implment transaction parsing.
+	var t models.Transaction
+	tm, err := time.Parse("01/02/2006 3:04PM PST", record[0])
+	if err != nil {
+		return models.Transaction{}, err
+	}
+	t.Date = tm
+	t.Description = record[1]
+	amount, err := strconv.ParseFloat(record[2])
+	if err != nil {
+		return models.Transaction{}, err
+	}
+	t.Amount = amount
+	t.AccountID = 
 	return models.Transaction{}, nil
 }
