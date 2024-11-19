@@ -6,7 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	_ "github.com/mattn/go-sqlite3"
-	"github.com/maximum-c/finance_dashboard/internal/api"
+	"github.com/maximum-c/finance_dashboard/internal/handlers"
 	"github.com/maximum-c/finance_dashboard/internal/service"
 	"github.com/maximum-c/finance_dashboard/internal/storage"
 )
@@ -24,7 +24,7 @@ func main() {
 
 	transactionStorage := storage.NewTransactionStorage(db)
 	financeService := service.NewFinanceService(transactionStorage)
-	handler := &api.Handler{Service: financeService}
+	handler := &handlers.Handler{Service: financeService}
 
 	r := gin.Default()
 
