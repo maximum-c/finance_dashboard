@@ -11,12 +11,12 @@ import (
 	"time"
 )
 
-type FinanceService struct {
+type TransactionService struct {
 	Storage *storage.TransactionStorage
 }
 
-func NewFinanceService(Storage *storage.TransactionStorage) *FinanceService {
-	return &FinanceService{Storage: Storage}
+func NewTransactionService(Storage *storage.TransactionStorage) *TransactionService {
+	return &TransactionService{Storage: Storage}
 }
 func validateHeaders(headers []string) (map[string]int, error) {
 	required := map[string]bool{
@@ -43,7 +43,7 @@ func validateHeaders(headers []string) (map[string]int, error) {
 	return headerMap, nil
 
 }
-func (s *FinanceService) ImportCSV(file io.Reader, accoundID int64) (int, error) {
+func (s *TransactionService) ImportCSV(file io.Reader, accoundID int64) (int, error) {
 	reader := csv.NewReader(file)
 
 	csvHeaders, err := reader.Read()
@@ -113,15 +113,10 @@ func parseTransaction(record []string, headerMap map[string]int, accountID int64
 
 }
 
-func (s *FinanceService) ImportTransactions(transactions []models.Transaction) error {
-	// todo implement
-	return nil
+func (s *TransactionService) FetchTransactionsWithFilter(filters models.TransactionFilter) ([]models.Transaction, error) {
+	return s.Storage.GetTransactions(filters)
 }
 
-func (s *FinanceService) GetTransactions(filter models.TransactionFilter) ([]models.Transaction, error) {
-	return nil, nil
-}
-
-func (s *FinanceService) GetAccountBalace(accountID int64) (float64, error) {
-	return 0, nil
+func (s *TransactionService) FetchTransactionStats(filters models.TransactionFilter) (map[string]float64, error) {
+	return s.Storage.GetTransactionsStats(filters)
 }

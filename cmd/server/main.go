@@ -23,12 +23,19 @@ func main() {
 	defer db.Close()
 
 	transactionStorage := storage.NewTransactionStorage(db)
-	financeService := service.NewFinanceService(transactionStorage)
-	handler := &handlers.Handler{Service: financeService}
+	TransactionService := service.NewTransactionService(transactionStorage)
+	apiHandler := handlers.NewAPIHandler(TransactionService)
+	csvHandler := handlers.NewCSVHandler(TransactionService)
 
 	r := gin.Default()
+	api := r.Group("/api")
+	{
+		api.GET("/transactions", apiHandler.GetTransactions)
 
-	r.POST("/upload/:accountID", handler.UploadCSV)
+		api.GET("/transactions/stats", apiHandler.GetTransactionStats)
+	}
+
+	r.POST("/upload/:accountID", csvHandler.UploadCSV)
 
 	if err := r.Run(":8080"); err != nil {
 		log.Fatal(err)

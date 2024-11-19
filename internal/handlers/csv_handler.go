@@ -10,11 +10,17 @@ import (
 	"github.com/maximum-c/finance_dashboard/internal/service"
 )
 
-type Handler struct {
-	Service *service.FinanceService
+type CSVHandler struct {
+	Service *service.TransactionService
 }
 
-func (h *Handler) UploadCSV(c *gin.Context) {
+func NewCSVHandler(service *service.TransactionService) *CSVHandler {
+	return &CSVHandler{
+		Service: service,
+	}
+}
+
+func (h *CSVHandler) UploadCSV(c *gin.Context) {
 
 	accountID, err := strconv.ParseInt(c.Param("accountID"), 10, 64)
 	if err != nil {
