@@ -1,14 +1,16 @@
 package service
 
 import (
+	"database/sql"
 	"encoding/csv"
 	"fmt"
-	"github.com/maximum-c/finance_dashboard/internal/models"
-	"github.com/maximum-c/finance_dashboard/internal/storage"
 	"io"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/maximum-c/finance_dashboard/internal/models"
+	"github.com/maximum-c/finance_dashboard/internal/storage"
 )
 
 type TransactionService struct {
@@ -98,9 +100,9 @@ func parseTransaction(record []string, headerMap map[string]int, accountID int64
 	if err != nil {
 		return models.Transaction{}, fmt.Errorf("invalid amount: %s", amountStr)
 	}
-	var category string
+	var category sql.NullString
 	if categoryIndex, exists := headerMap["category"]; exists && categoryIndex < len(record) {
-		category = record[categoryIndex]
+		category = sql.NullString{String: record[categoryIndex], Valid: true}
 	}
 	return models.Transaction{
 		Date:        date,
@@ -118,5 +120,5 @@ func (s *TransactionService) FetchTransactionsWithFilter(filters models.Transact
 }
 
 func (s *TransactionService) FetchTransactionStats(filters models.TransactionFilter) (map[string]float64, error) {
-	return s.Storage.GetTransactionsStats(filters)
+	return s.Storage.GetTransactionStats(filters)
 }

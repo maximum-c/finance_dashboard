@@ -19,8 +19,18 @@ func NewAPIHandler(service *service.TransactionService) *APIHandler {
 		TransactionService: service,
 	}
 }
-func parseFilters(filters *models.TransactionFilter, c *gin.Context) {
 
+// THIS NEEDS TO BE FIXED SHOULD RETURN ERROR TO HANDLER NOT JUST THROW JSON
+func parseFilters(filters *models.TransactionFilter, c *gin.Context) {
+	if accountID := c.Query("accountID"); accountID != "" {
+		parsedID, err := strconv.ParseInt(accountID, 10, 64)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid account ID"})
+			log.Printf("invalid account id: %v\n", accountID)
+			return
+		}
+		filters.AccountID = &parsedID
+	}
 	if startDate := c.Query("startDate"); startDate != "" {
 		parsedDate, err := time.Parse("2006-01-02 3:04 PM", startDate)
 		if err != nil {

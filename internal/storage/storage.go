@@ -137,7 +137,7 @@ func (s *TransactionStorage) GetTransactions(filter models.TransactionFilter) ([
 		query += " AND " + strings.Join(conditions, " AND ")
 	}
 
-	query += "ORDER BY date DESC"
+	query += " ORDER BY date DESC"
 
 	rows, err := s.db.Query(query, args...)
 	if err != nil {
@@ -153,6 +153,7 @@ func (s *TransactionStorage) GetTransactions(filter models.TransactionFilter) ([
 			&t.ID,
 			&t.Date,
 			&t.Description,
+			&t.Amount,
 			&t.Category,
 			&t.AccountID,
 			&t.CreatedAt,
@@ -163,4 +164,57 @@ func (s *TransactionStorage) GetTransactions(filter models.TransactionFilter) ([
 		transactions = append(transactions, t)
 	}
 	return transactions, nil
+}
+
+func (s *TransactionStorage) GetTransactionStats(filter models.TransactionFilter) (map[string]float64, error) {
+	query := `
+		SELECT category, SUM(amount) as total
+		FROM transactions
+		WHERE 1=1
+	`
+
+	var conditions []string
+	var args []interface{}
+
+	if filter.StartDate != nil {
+		conditions = append(conditions, "date >= ?")
+		args = append(args, filter.StartDate)
+	}
+
+	if filter.EndDate != nil {
+		conditions = append(conditions, "date <= ?")
+		args = append(args, filter.EndDate)
+	}
+
+	if filter.Category != nil {
+		conditions = append(conditions, "category = ?")
+		args = append(args, filter.Category)
+	}
+
+	if filter.AccountID != nil {
+		conditions = append(conditions, "account_id = ?")
+		args = append(args, filter.AccountID)
+	}
+
+	for len(conditions) > 0 {
+		query += " AND " + strings.Join(conditions, " AND ")
+	}
+
+	query += " ORDER BY date DESC"
+	rows, err := s.db.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	stats := make(map[string]float64)
+	for rows.Next() {
+		var category string
+		var total float64
+		if err := rows.Scan(&category, &total); err != nil {
+			return nil, err
+		}
+		stats[category] = total
+	}
+	return stats, nil
 }

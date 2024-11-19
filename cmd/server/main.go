@@ -2,13 +2,13 @@ package main
 
 import (
 	"database/sql"
-	"log"
-
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/maximum-c/finance_dashboard/internal/handlers"
 	"github.com/maximum-c/finance_dashboard/internal/service"
 	"github.com/maximum-c/finance_dashboard/internal/storage"
+	"log"
 )
 
 func main() {
@@ -28,9 +28,16 @@ func main() {
 	csvHandler := handlers.NewCSVHandler(TransactionService)
 
 	r := gin.Default()
+	r.Use(cors.New(cors.Config{
+		AllowOrigins:     []string{"http://localhost:3000"},
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE"},
+		AllowHeaders:     []string{"Content-Type", "Authorization"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: true,
+	}))
 	api := r.Group("/api")
 	{
-		api.GET("/transactions", apiHandler.GetTransactions)
+		api.GET("/transactions/:accountID", apiHandler.GetTransactions)
 
 		api.GET("/transactions/stats", apiHandler.GetTransactionStats)
 	}
